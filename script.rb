@@ -19,29 +19,25 @@ end
 
 
 class Translator
-  NAME_TRANSLATION = {'П1' => 'ML1', 'Х' => 'X', 'П2' => '2', '1Х' => '1X', '12' => '12', 'Х2' => 'X2',"Кф1" => "F1", "Кф2" => "F2", "К1" => "F1", "К2" => "F2", "Бол" => "TO", "Мен" => "TU"}
-  SPORT_NAME_TRANSLATION = {'Футбол' => 'soccer', 'Хоккей' => 'hockey', 'Теннис' => 'tennis', 'Снукер' => 'snooker', 'Гандбол' => 'handball', 'Волейбол' => 'volleyball', 'Баскетбол' => 'basketball','Настольный теннис' => 'table tennis'}
-  DOUBLED_VALUES = {"Кф1" => "Ф1", "Кф2" => "Ф2", "К1" => "Ф1", "К2" => "Ф2", "Бол" => "Тот", "Мен" => "Тот"}
+  NAME_TRANSLATION = {'П1' => 'ML1', 'Х' => 'X', 'П2' => '2', '1Х' => '1X', '12' => '12', 'Х2' => 'X2','Кф1' => 'F1', 'Кф2' => 'F2', 'К1' => 'F1', 'К2' => 'F2', 'Бол' => 'TO', 'Мен' => 'TU'}
+  #SPORT_NAME_TRANSLATION = {'Футбол' => 'soccer', 'Хоккей' => 'hockey', 'Теннис' => 'tennis', 'Снукер' => 'snooker', 'Гандбол' => 'handball', 'Волейбол' => 'volleyball', 'Баскетбол' => 'basketball','Настольный теннис' => 'table_tennis'}
+  DOUBLED_VALUES = {'Кф1' => 'Ф1', 'Кф2' => 'Ф2', 'К1' => 'Ф1', 'К2' => 'Ф2', 'Бол' => 'Тот', 'Мен' => 'Тот'}
 
   def initialize
     @sport = nil
   end
 
-  def translate_game(name)
-    raise "No translation for game name #{name.inspect}" unless SPORT_NAME_TRANSLATION.keys.include?(name)
-    SPORT_NAME_TRANSLATION[name]
-  end
 
   def sport=(name=nil)
-    if SPORT_NAME_TRANSLATION.keys.include?(name)
-      @sport = SPORT_NAME_TRANSLATION[name]
-    elsif SPORT_NAME_TRANSLATION.values.include?(name) || name.nil?
-      @sport = name
-    end
+    @sport = name.gsub(/ /,'_')
     if name && !self.instance_variable_get("@#{@sport}")
       self.instance_variable_set("@#{@sport}", {})
     end
 
+  end
+
+  def sport_()
+    @sport.gsub(/ /,'_')
   end
 
   def sport()
@@ -50,7 +46,7 @@ class Translator
 
   def get_values(key, values)
     raise "No translation for #{key.inspect}" unless self.has?(key)
-    translated = if val = self.instance_variable_get("@#{@sport}")[key]
+    translated = if val = self.instance_variable_get("@#{sport_}")[key]
             val
           else
             NAME_TRANSLATION[key]
@@ -60,16 +56,16 @@ class Translator
   end
 
   def has?(key)
-    (self.instance_variable_get("@#{@sport}").keys + NAME_TRANSLATION.keys + DOUBLED_VALUES.keys + DOUBLED_VALUES.values).include? key
+    (self.instance_variable_get("@#{sport_}").keys + NAME_TRANSLATION.keys + DOUBLED_VALUES.keys + DOUBLED_VALUES.values).include? key
   end
 
   def []=(key, val)
-    self.instance_variable_get("@#{@sport}")[key] = val
+    self.instance_variable_get("@#{sport_}")[key] = val
   end
 end
 
 translation = Translator.new()
-translation.sport = "soccer"
+translation.sport = 'Футбол'
 translation['П1'] = '1'
 
 
@@ -91,20 +87,20 @@ end
 
 def get_labels(heads)
   labels = []
-  heads.each { |head| labels << head.text.gsub(/(^  *)|(  *$)/, "") unless head.text == "" }
+  heads.each { |head| labels << head.text.gsub(/(^  *)|(  *$)/, '') unless head.text == "" }
   labels
 end
 
 lines = {}
-fetch_html.css("div.b-sport").each do |sport|
-  name = sport.css("span.b-league-name-label")[0].text.split(". ")[1]
+fetch_html.css('div.b-sport').each do |sport|
+  name = sport.css('span.b-league-name-label')[0].text.split('. ')[1]
   lines[name] ||= []
   (sport.children.length / 2).times do |i|
     line = {}
     line['periods'] = {}
     line['periods']['main_line'] = {}
     line['additional_totals'] = {}
-    line['league_name'] = sport.css('span.b-league-name-label')[i].text.split(". ")[2..-1].join('. ')
+    line['league_name'] = sport.css('span.b-league-name-label')[i].text.split('. ')[2..-1].join('. ')
     league_body = sport.css('div.b-league')[i]
     matches = league_body.css('table.t-league')
     (matches.children.length / 2).times do |match_num|
@@ -117,7 +113,7 @@ fetch_html.css("div.b-sport").each do |sport|
 
       line['time'] = main_line.css('td')[0].text.gsub(/(^  *)|(  *$)/, "")
       line['event'] = main_line.css('td')[1].text
-      line["home_team"], line["away_team"] = line['event'].split(" - ").map { |val| val.gsub(/(^ *)|( ?[0-9:*]+.*)|( *$)/, "") }
+      line['home_team'], line['away_team'] = line['event'].split(" - ").map { |val| val.gsub(/(^ *)|( ?[0-9:*]+.*)|( *$)/, "") }
 
       additional_info = match_body.css('tr.t-league__ross > td > div')
       additional_lines = additional_info.css('table')
@@ -137,21 +133,18 @@ fetch_html.css("div.b-sport").each do |sport|
 
     lines[name] << line.clone
   end
-  bla = 0
 end
 
 
-lines.each do |key, val|
-  game = translation.translate_game(key)
+lines.each do |game, val|
   translation.sport = game
-  if game
     val.each do |match|
-      bookmaker_event = get_bookmaker_event(game, match["home_team"], match["away_team"], Time.now.to_s, match['time'])
+      bookmaker_event = get_bookmaker_event(game, match['home_team'], match['away_team'], Time.now.to_s, match['time'])
       match['periods'].each do |name, period|
-        if name == "main_line"
-          per = (%w(basketball tennis).include? game )? '-1' : "0"
+        if name == 'main_line'
+          per = (%w(basketball tennis).include? game )? '-1' : '0'
         else
-          per = name.gsub(/-.+/, "")
+          per = name.gsub(/-.+/, '')
         end
 
         period.each do |k, v|
@@ -163,5 +156,4 @@ lines.each do |key, val|
 
       end
     end
-  end
 end
