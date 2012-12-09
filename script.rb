@@ -118,7 +118,7 @@ fetch_html.css('div.b-sport').each do |sport|
 
       additional_info = match_body.css('tr.t-league__ross > td > div')
       additional_lines = additional_info.css('table')
-      additional_totals = additional_info.css('div')
+      additional_totals = match_body.css('tr.t-league__ross > td > div > div')
       labels = get_labels(additional_lines.css('th'))
       additional_lines.css('tbody > tr').each do |row|
         line_name = row.css('td')[0].text.gsub(/[^0-9]+/, '')
