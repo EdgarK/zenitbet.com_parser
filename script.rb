@@ -2,25 +2,13 @@
 require "rubygems"
 require 'net/http'
 require 'nokogiri'
+require "date"
 
 
-def create_or_update_bet(bookmaker_event, period, bet_variation, value, koef, direct_link = nil, commission = 0, is_lay = false, market = nil)
-  puts "bookmaker_event => #{bookmaker_event}, period => #{period}, bet_variation => #{bet_variation}, value => #{value}, koef => #{koef}"
-end
-
-@count = 1
-
-def get_bookmaker_event(*args)
-  result = "#{ @count }."
-  %w(sport, home_team, away_team, date, time).each_with_index { |name, i| result << " #{name} => '#{args[i]}' " }
-  puts result
-  @count += 1
-end
 
 
 class Translator
-  NAME_TRANSLATION = {'П1' => 'ML1', 'Х' => 'X', 'П2' => '2', '1Х' => '1X', '12' => '12', 'Х2' => 'X2','Кф1' => 'F1', 'Кф2' => 'F2', 'К1' => 'F1', 'К2' => 'F2', 'Бол' => 'TO', 'Мен' => 'TU'}
-  #SPORT_NAME_TRANSLATION = {'Футбол' => 'soccer', 'Хоккей' => 'hockey', 'Теннис' => 'tennis', 'Снукер' => 'snooker', 'Гандбол' => 'handball', 'Волейбол' => 'volleyball', 'Баскетбол' => 'basketball','Настольный теннис' => 'table_tennis'}
+  NAME_TRANSLATION = {'П1' => 'ML1', 'Х' => 'X', 'П2' => '2', '1Х' => '1X', '12' => '12', 'Х2' => 'X2', 'Кф1' => 'F1', 'Кф2' => 'F2', 'К1' => 'F1', 'К2' => 'F2', 'Бол' => 'TO', 'Мен' => 'TU'}
   DOUBLED_VALUES = {'Кф1' => 'Ф1', 'Кф2' => 'Ф2', 'К1' => 'Ф1', 'К2' => 'Ф2', 'Бол' => 'Тот', 'Мен' => 'Тот'}
 
   def initialize
@@ -29,7 +17,7 @@ class Translator
 
 
   def sport=(name=nil)
-    @sport = name.gsub(/ /,'_')
+    @sport = name.gsub(/ /, '_')
     if name && !self.instance_variable_get("@#{@sport}")
       self.instance_variable_set("@#{@sport}", {})
     end
@@ -37,7 +25,7 @@ class Translator
   end
 
   def sport_()
-    @sport.gsub(/ /,'_')
+    @sport.gsub(/ /, '_')
   end
 
   def sport()
@@ -47,10 +35,10 @@ class Translator
   def get_values(key, values)
     raise "No translation for #{key.inspect}" unless self.has?(key)
     translated = if val = self.instance_variable_get("@#{sport_}")[key]
-            val
-          else
-            NAME_TRANSLATION[key]
-          end
+                   val
+                 else
+                   NAME_TRANSLATION[key]
+                 end
 
     [translated, values[DOUBLED_VALUES[key]], values[key]] if translated
   end
@@ -67,8 +55,6 @@ end
 translation = Translator.new()
 translation.sport = 'Футбол'
 translation['П1'] = '1'
-
-
 
 
 def fetch_html
@@ -104,7 +90,7 @@ fetch_html.css('div.b-sport').each do |sport|
       match_head = matches.css('thead')[match_num]
       match_body = league_body.css('table.t-league > tbody')[match_num]
       main_line = match_body.css('tr.o, tr.e')
-      event = main_line.css('td')[1].text
+      event = main_line.css('td')[1].text.gsub(/ ?[0-9:*]+.*/, '')
       lines[name][league_name][event] = {}
       lines[name][league_name][event]['periods'] = {}
       lines[name][league_name][event]['periods']['main_line'] = {}
@@ -135,25 +121,32 @@ fetch_html.css('div.b-sport').each do |sport|
   end
 end
 
-
-lines.each do |game, val|
+result = {}
+lines.each do |game, leagues|
+  result[game] = {}
   translation.sport = game
-    val.each do |match|
-      bookmaker_event = get_bookmaker_event(game, match['home_team'], match['away_team'], Time.now.to_s, match['time'])
+  leagues.each do |league_name, events|
+    result[game][league_name]={}
+    events.each do |game_name, match|
+      match_full_name = "#{match['home_team']}, #{match['away_team']}, #{Date.today.to_s}-#{match['time']}"
+      result[game][league_name][match_full_name]||=[]
       match['periods'].each do |name, period|
         if name == 'main_line'
-          per = (%w(basketball tennis).include? game )? '-1' : '0'
+          per = (%w(basketball tennis).include? game) ? '-1' : '0'
         else
           per = name.gsub(/-.+/, '')
         end
 
         period.each do |k, v|
           if k && (values = translation.get_values(k, period))
-            create_or_update_bet(bookmaker_event, per, *values)
+            result[game][league_name][match_full_name] << [per, *values]
           end
 
         end
-
       end
+
     end
+  end
 end
+
+puts result
