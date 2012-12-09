@@ -94,26 +94,27 @@ end
 lines = {}
 fetch_html.css('div.b-sport').each do |sport|
   name = sport.css('span.b-league-name-label')[0].text.split('. ')[1]
-  lines[name] ||= []
+  lines[name] ||= {}
   (sport.children.length / 2).times do |i|
-    line = {}
-    line['periods'] = {}
-    line['periods']['main_line'] = {}
-    line['additional_totals'] = {}
-    line['league_name'] = sport.css('span.b-league-name-label')[i].text.split('. ')[2..-1].join('. ')
+    league_name = sport.css('span.b-league-name-label')[i].text.split('. ')[2..-1].join('. ')
+    lines[name][league_name] ||= {}
     league_body = sport.css('div.b-league')[i]
     matches = league_body.css('table.t-league')
     (matches.children.length / 2).times do |match_num|
       match_head = matches.css('thead')[match_num]
-      labels = get_labels(match_head.css('th')[2..-1])
       match_body = league_body.css('table.t-league > tbody')[match_num]
       main_line = match_body.css('tr.o, tr.e')
+      event = main_line.css('td')[1].text
+      lines[name][league_name][event] = {}
+      lines[name][league_name][event]['periods'] = {}
+      lines[name][league_name][event]['periods']['main_line'] = {}
+      lines[name][league_name][event]['additional_totals'] = {}
+      labels = get_labels(match_head.css('th')[2..-1])
 
-      main_line.css('td')[2..-1].each_with_index { |column, index| line['periods']['main_line'][labels[index]] = column.text if !['', ' '].include?(column.text) && labels[index] }
+      main_line.css('td')[2..-1].each_with_index { |column, index| lines[name][league_name][event]['periods']['main_line'][labels[index]] = column.text if !['', ' '].include?(column.text) && labels[index] }
 
-      line['time'] = main_line.css('td')[0].text.gsub(/(^  *)|(  *$)/, "")
-      line['event'] = main_line.css('td')[1].text
-      line['home_team'], line['away_team'] = line['event'].split(" - ").map { |val| val.gsub(/(^ *)|( ?[0-9:*]+.*)|( *$)/, "") }
+      lines[name][league_name][event]['time'] = main_line.css('td')[0].text.gsub(/(^  *)|(  *$)/, "")
+      lines[name][league_name][event]['home_team'], lines[name][league_name][event]['away_team'] = event.split(" - ").map { |val| val.gsub(/(^ *)|( ?[0-9:*]+.*)|( *$)/, "") }
 
       additional_info = match_body.css('tr.t-league__ross > td > div')
       additional_lines = additional_info.css('table')
@@ -121,17 +122,16 @@ fetch_html.css('div.b-sport').each do |sport|
       labels = get_labels(additional_lines.css('th'))
       additional_lines.css('tbody > tr').each do |row|
         line_name = row.css('td')[0].text.gsub(/[^0-9]+/, '')
-        line['periods'][line_name] = {}
-        row.css('td')[1..-1].each_with_index { |column, index| line['periods'][line_name][labels[index]] = column.text if !['', ' '].include?(column.text) }
+        lines[name][league_name][event]['periods'][line_name] = {}
+        row.css('td')[1..-1].each_with_index { |column, index| lines[name][league_name][event]['periods'][line_name][labels[index]] = column.text if !['', ' '].include?(column.text) }
       end
       additional_totals.each do |total|
         total_name = total.text.split(':')[0]
         total_value = Array(total.text.split(':')[1..-1]).join(':')
-        line['additional_totals'][total_name] = total_value
+        lines[name][league_name][event]['additional_totals'][total_name] = total_value
       end
     end
 
-    lines[name] << line.clone
   end
 end
 
