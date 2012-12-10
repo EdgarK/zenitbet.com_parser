@@ -3,14 +3,15 @@ require "rubygems"
 require 'net/http'
 require 'nokogiri'
 require "date"
+require "../test"
 
 
 
 
 class Translator
-  NAME_TRANSLATION = {'П1' => 'ML1', 'Х' => 'X', 'П2' => '2', '1Х' => '1X', '12' => '12', 'Х2' => 'X2', 'Кф1' => 'F1', 'Кф2' => 'F2', 'К1' => 'F1', 'К2' => 'F2', 'Бол' => 'TO', 'Мен' => 'TU'}
+  NAME_TRANSLATION = {'П1' => '1', 'Х' => 'X', 'П2' => '2', '1Х' => '1X', '12' => '12', 'Х2' => 'X2', 'Кф1' => 'F1', 'Кф2' => 'F2', 'К1' => 'F1', 'К2' => 'F2', 'Бол' => 'TO', 'Мен' => 'TU', 'больше' => 'TO', 'меньше' => 'TU', 'чётныйтоталматча' => 'EVEN', 'нечётныйтоталматча' => 'ODD'}
   DOUBLED_VALUES = {'Кф1' => 'Ф1', 'Кф2' => 'Ф2', 'К1' => 'Ф1', 'К2' => 'Ф2', 'Бол' => 'Тот', 'Мен' => 'Тот'}
-
+  MAIN_LINE_NUMBERS = {'Теннис' => '-1', 'Баскетбол' => '-1','Настольный теннис' => '-1'}
   def initialize
     @sport = nil
   end
@@ -22,6 +23,11 @@ class Translator
       self.instance_variable_set("@#{@sport}", {})
     end
 
+  end
+
+  def main_line_number()
+    return MAIN_LINE_NUMBERS[@sport] if MAIN_LINE_NUMBERS[@sport]
+    '0'
   end
 
   def sport_()
@@ -53,8 +59,9 @@ class Translator
 end
 
 translation = Translator.new()
-translation.sport = 'Футбол'
-translation['П1'] = '1'
+translation.sport = 'Баскетбол'
+translation['П1'] = 'ML1'
+translation['П2'] = 'ML2'
 
 
 def fetch_html
@@ -66,8 +73,8 @@ def fetch_html
   request = Net::HTTP::Post.new "/line/loadline"
   request.set_form_data({'live' => 1})
   request.initialize_http_header({'Cookie' => cookies, 'charset' => "windows-1251"})
-
-  Nokogiri::HTML(http.request(request).body.force_encoding("windows-1251").encode('utf-8'), nil, 'utf-8')
+  body = http.request(request).body.force_encoding("windows-1251")
+  Nokogiri::HTML(body.encode('utf-8'), nil, 'utf-8')
 end
 
 
@@ -113,6 +120,7 @@ fetch_html.css('div.b-sport').each do |sport|
       end
       additional_totals.each do |total|
         total_name = total.text.split(':')[0]
+        total_name = "#{total_name} second" if lines[name][league_name][event]['additional_totals'][total_name]
         total_value = Array(total.text.split(':')[1..-1]).join(':')
         lines[name][league_name][event]['additional_totals'][total_name] = total_value
       end
@@ -129,10 +137,10 @@ lines.each do |game, leagues|
     result[game][league_name]={}
     events.each do |game_name, match|
       match_full_name = "#{match['home_team']}, #{match['away_team']}, #{Date.today.to_s}-#{match['time']}"
-      result[game][league_name][match_full_name]||=[]
+      result[game][league_name][match_full_name]||=[] unless match['periods'].empty? && match['additional_totals'].empty?
       match['periods'].each do |name, period|
         if name == 'main_line'
-          per = (%w(basketball tennis).include? game) ? '-1' : '0'
+          per = translation.main_line_number
         else
           per = name.gsub(/-.+/, '')
         end
@@ -143,10 +151,53 @@ lines.each do |game, leagues|
           end
 
         end
+
+      end
+      match['additional_totals'].each do |key, val|
+        if key =~(/(дополнительные тоталы)|(Чёт\/Нечёт)/i)
+          number = key.gsub(/[^0-9]*/,'')
+          number = translation.main_line_number if ['', nil].include? number
+          type = ''
+          val.split(';').map{|v|v.split(', ')}.flatten.each do |values|
+            new_type = values.gsub(/[0-9\(\)., -]*/i,'')
+            type = Translator::NAME_TRANSLATION[new_type] if !['',' '].include? new_type
+            values.gsub!(/[^0-9,.-]/,'')
+            result[game][league_name][match_full_name] << [number, type, *((values.split('-')).map{|v| (v == '')? nil : v})] if !['',' '].include? values
+
+          end
+        elsif key =~ (/Победитель матча/i)
+          val.split('; ').each_with_index{|team_score, role| result[game][league_name][match_full_name] << [translation.main_line_number, (role+1).to_s, nil, team_score.split(' - ')[1]]}
+        elsif key =~ (/Индивидуальные тоталы/i)
+          team, totals = val.split('меньше')
+          less_and_more = totals.split('больше')
+          team.gsub!(/(^ ?)|( ?$)/,'')
+          names = (team == match['home_team'])? %w(I1TU I1TO) : %w(I2TU I2TO)
+          less_and_more.each_with_index do |vals, ind|
+            vals.split(';').each do |values|
+              values = values.split(' - ').map{|v| v.gsub(/[^0-9.,-]/, '')}
+              result[game][league_name][match_full_name] << [translation.main_line_number, names[ind], *values] if values != ['']
+            end
+          end
+        elsif key =~ (/Дополнительные форы/i)
+
+          home = val.split(/\W+: /)[1]
+          away = val.split(/\W+: /)[2]
+          home.split('; ').each do |handicaps|
+            handicaps.gsub!(/[()]/, '')
+            values = handicaps.split(' - ').map{|v| v.gsub(/[^0-9.,-]/,'')}
+            result[game][league_name][match_full_name] << [translation.main_line_number, 'F1', *values] if values != ['']
+          end
+          away.split('; ').each do |handicaps|
+            handicaps.gsub!(/[()]/, '')
+            values = handicaps.split(' - ').map{|v| v.gsub(/[^0-9.,-]/,'')}
+            result[game][league_name][match_full_name] << [translation.main_line_number, 'F2', *values] if values != ['']
+          end
+        end
       end
 
     end
   end
 end
 
-puts result
+
+  puts result.inspect
