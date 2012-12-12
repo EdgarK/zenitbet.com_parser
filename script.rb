@@ -59,9 +59,11 @@ class Translator
 end
 
 translation = Translator.new()
-translation.sport = 'Баскетбол'
-translation['П1'] = 'ML1'
-translation['П2'] = 'ML2'
+for sport in %w(Теннис Волейбол Баскетбол) do
+  translation.sport = sport
+  translation['П1'] = 'ML1'
+  translation['П2'] = 'ML2'
+end
 
 
 def fetch_html
