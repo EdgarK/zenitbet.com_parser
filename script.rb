@@ -206,3 +206,22 @@ end
 
 
 puts result.inspect
+
+puts ('_'*66)
+result.each do |key, val|
+  puts "| sport =>  #{key}#{' '*(54-key.length)}|"
+  puts "#{'-'*66}"
+  val.each do |k, v|
+    puts "|  League => #{k}#{' '*(52*k.length)}|"
+    puts "#{'-'*66}"
+    v.each do |ke, va|
+      puts "|  Match  => #{ke}#{' '*(53-ke.length)}|"
+      puts"#{'-'*66}"
+      puts "|  period  |        isxod         |    value       |    koef      |"
+      va.each do |arr|
+        puts "|     #{arr[0]}#{' '*(5-arr[0].length)}|          #{arr[1]}#{' '*(12-arr[1].length)}|     #{arr[2]}#{' '*(11-arr[2].to_s.length)}|    #{arr[3]}#{' '*(10-arr[3].length)}|"
+      end
+      puts ('.'*66)
+    end
+  end
+end
