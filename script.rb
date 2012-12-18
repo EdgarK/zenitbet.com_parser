@@ -80,6 +80,11 @@ def fetch_html
   request.initialize_http_header({'Cookie' => cookies, 'charset' => "windows-1251"})
   body = http.request(request).body.force_encoding("windows-1251")
   Nokogiri::HTML(body.encode('utf-8'), nil, 'utf-8')
+
+
+
+  #body = File.open('zenitbet.html').read.force_encoding("windows-1251")
+  #Nokogiri::HTML(body.encode('utf-8'), nil, 'utf-8')
 end
 
 
@@ -99,7 +104,7 @@ fetch_html.css('div.b-sport').each do |sport|
     league_body = sport.css('div.b-league')[i]
     matches = league_body.css('table.t-league')
     (matches.children.length / 2).times do |match_num|
-      match_head = matches.css('thead')[match_num]
+      match_head = matches.css('> thead')[match_num]
       match_body = league_body.css('table.t-league > tbody')[match_num]
       main_line = match_body.css('tr.o, tr.e')
       event = main_line.css('td')[1].text.gsub(/ ?[0-9:*]+.*/, '')
@@ -215,7 +220,7 @@ result.each do |key, val|
     puts "|  League => #{k}#{' '*(52*k.length)}|"
     puts "#{'-'*66}"
     v.each do |ke, va|
-      puts "|  Match  => #{ke}#{' '*(53-ke.length)}|"
+      puts "|  Match  => #{ke}#{' '*(80-ke.length)}|"
       puts"#{'-'*66}"
       puts "|  period  |        isxod         |    value       |    koef      |"
       va.each do |arr|
